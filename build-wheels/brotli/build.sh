@@ -11,11 +11,10 @@ echo "Detected version: $PKG_VER"
 NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
 export PATH="$NDK_BIN:$PATH"
 
-LONG_BIT_FLAG=""
 case "$ARCH" in
     "arm64-v8a")   CC_TARGET="aarch64-linux-android${API_LEVEL}"; PLAT_TAG="linux_aarch64" ;;
-    "armeabi-v7a") CC_TARGET="armv7a-linux-androideabi${API_LEVEL}"; PLAT_TAG="linux_armv7l"; LONG_BIT_FLAG="-DPY_LONG_SIZE_T=4" ;;
-    "x86")         CC_TARGET="i686-linux-android${API_LEVEL}"; PLAT_TAG="linux_i686"; LONG_BIT_FLAG="-DPY_LONG_SIZE_T=4" ;;
+    "armeabi-v7a") CC_TARGET="armv7a-linux-androideabi${API_LEVEL}"; PLAT_TAG="linux_armv7l" ;;
+    "x86")         CC_TARGET="i686-linux-android${API_LEVEL}"; PLAT_TAG="linux_i686" ;;
     "x86_64")      CC_TARGET="x86_64-linux-android${API_LEVEL}"; PLAT_TAG="linux_x86_64" ;;
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
@@ -28,6 +27,13 @@ mkdir -p "$MOCK_DIR"
 
 HOST_INCLUDE=$(python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
 
+if [ "$ARCH" == "armeabi-v7a" ] || [ "$ARCH" == "x86" ]; then
+    echo "Patching host Python headers for 32-bit cross-compilation..."
+    sudo find "$HOST_INCLUDE" -type f -name "pyconfig*.h" -exec sed -i 's/#define SIZEOF_LONG 8/#define SIZEOF_LONG 4/g' {} +
+    sudo find "$HOST_INCLUDE" -type f -name "pyconfig*.h" -exec sed -i 's/#define SIZEOF_VOID_P 8/#define SIZEOF_VOID_P 4/g' {} +
+    sudo find "$HOST_INCLUDE" -type f -name "pyconfig*.h" -exec sed -i 's/#define SIZEOF_SIZE_T 8/#define SIZEOF_SIZE_T 4/g' {} +
+fi
+
 SYSCONFIG_NAME="_sysconfigdata__linux_aarch64"
 cat > "$MOCK_DIR/${SYSCONFIG_NAME}.py" <<EOF
 build_time_vars = {
@@ -37,7 +43,7 @@ build_time_vars = {
     'AR': '$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar',
     'LD': '$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld',
     'LDSHARED': '$NDK_BIN/${CC_TARGET}-clang -shared',
-    'ARFLAGS': 'rcs', 'CFLAGS': '-fPIC', 'CXXFLAGS': '-fPIC', 'CPPFLAGS': '-I$HOST_INCLUDE $LONG_BIT_FLAG',
+    'ARFLAGS': 'rcs', 'CFLAGS': '-fPIC', 'CXXFLAGS': '-fPIC', 'CPPFLAGS': '-I$HOST_INCLUDE',
     'LDFLAGS': '-L$MOCK_DIR -lpython$PY_VER', 'CCSHARED': '-fPIC', 'VERSION': '$PY_VER',
     'GNULD': 'yes', 'Py_DEBUG': 0, 'WITH_PYMALLOC': 1,
 }
@@ -54,8 +60,7 @@ export CC="$NDK_BIN/${CC_TARGET}-clang"
 export CXX="$NDK_BIN/${CC_TARGET}-clang++"
 export AR="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
 export LDSHARED="$CC -shared"
-export CFLAGS="-target $CC_TARGET -fPIC -I$HOST_INCLUDE $LONG_BIT_FLAG"
-export CPPFLAGS="-I$HOST_INCLUDE $LONG_BIT_FLAG"
+export CFLAGS="-target $CC_TARGET -fPIC -I$HOST_INCLUDE"
 export LDFLAGS="-target $CC_TARGET -L$MOCK_DIR -lpython$PY_VER"
 
 PY_TAG="cp${PY_VER/./}"
@@ -71,7 +76,6 @@ exec(open('setup.py').read(), {'__file__': 'setup.py', '__name__': '__main__'})
 
 OLD_WHEEL=$(ls dist/*.whl)
 NEW_WHEEL=$(echo "$OLD_WHEEL" | sed -E "s/(-[^-]+)\.whl$/-${PLAT_TAG}.whl/")
-
 if [ "$OLD_WHEEL" != "$NEW_WHEEL" ]; then
     mv "$OLD_WHEEL" "$NEW_WHEEL"
 fi
