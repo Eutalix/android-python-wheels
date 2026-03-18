@@ -39,9 +39,14 @@ jobs:
         with:
           python-version: ${{ matrix.py_ver }}
 
+      - name: Setup Java 17 (Required for Android SDK)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
       - name: Setup Android NDK
         uses: android-actions/setup-android@v3
-      - run: yes | sdkmanager "ndk;${{ env.NDK_VERSION }}" > /dev/null
         
       - name: 🚀 Execute build.sh
         env:
