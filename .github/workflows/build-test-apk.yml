@@ -30,11 +30,7 @@ jobs:
       - name: 🔨 Build APK via Gradle
         working-directory: ./test-runner
         run: |
-          if [ ! -f "./gradlew" ]; then
-            gradle wrapper --gradle-version 8.2.2
-          fi
           chmod +x ./gradlew
-          
           ./gradlew assembleDebug
           
           mv app/build/outputs/apk/debug/app-debug.apk "../kivy-test-runner-cp311-arm64-v8a.apk"
