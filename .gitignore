@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.env/
+venv/
+wheel_staging/
+dist/
+
+# Android / Gradle
+test-runner/.gradle/
+test-runner/build/
+test-runner/app/build/
+test-runner/local.properties
+test-runner/**/*.apk
+test-runner/**/*.aar
+test-runner/**/*.so
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Github Pages
+site/
+public/
