@@ -69,7 +69,11 @@ exec(open('setup.py').read(), {'__file__': 'setup.py', '__name__': '__main__'})
 
 OLD_WHEEL=$(ls dist/*.whl)
 NEW_WHEEL=$(echo "$OLD_WHEEL" | sed -E "s/(-[^-]+)\.whl$/-${PLAT_TAG}.whl/")
-mv "$OLD_WHEEL" "$NEW_WHEEL"
+
+if [ "$OLD_WHEEL" != "$NEW_WHEEL" ]; then
+    mv "$OLD_WHEEL" "$NEW_WHEEL"
+fi
+
 WHEEL_ABS="$(pwd)/$NEW_WHEEL"
 
 sudo apt-get update -qq && sudo apt-get install -y -qq patchelf
