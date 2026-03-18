@@ -23,7 +23,7 @@ WORKDIR="$(pwd)/build_workspace"
 MOCK_DIR="$WORKDIR/mock_libs"
 mkdir -p "$MOCK_DIR"
 
-"$NDK_BIN/clang" --target=$CC_TARGET -shared -Wl,-soname,libpython$PY_VER.so -o "$MOCK_DIR/libpython$PY_VER.so" -xc /dev/null
+"$NDK_BIN/${CC_TARGET}-clang" -shared -Wl,-soname,libpython$PY_VER.so -o "$MOCK_DIR/libpython$PY_VER.so" -xc /dev/null
 
 HOST_INCLUDE=$(python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
 
