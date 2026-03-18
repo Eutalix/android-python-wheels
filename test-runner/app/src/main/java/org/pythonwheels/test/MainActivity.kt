@@ -31,10 +31,6 @@ class MainActivity : Activity() {
                 
                 val runnerScript = File(filesDir, "runner.py")
                 copyAsset("runner.py", runnerScript)
-                
-                val nativeDir = File(applicationInfo.nativeLibraryDir)
-                val pythonExe = File(nativeDir, "libpython.so")
-                val stdlibZip = File(nativeDir, "libpython.zip.so")
 
                 // 1. Extract base C-Extensions (zlib, math)
                 val modulesDir = File(filesDir, "modules")
@@ -46,12 +42,25 @@ class MainActivity : Activity() {
                 val sitePackagesDir = File(filesDir, "site-packages")
                 sitePackagesDir.mkdirs()
 
-                // 3. Absolute Target for Python 3.11 Guardian
-                val realPythonLib = File(nativeDir, "libpython3.11.so")
+                // 3. Absolute Target for Python 3.11 Guardian (Houdini-safe fallback)
+                var nativeDir = File(applicationInfo.nativeLibraryDir)
+                var realPythonLib = File(nativeDir, "libpython3.11.so")
+                
                 if (!realPythonLib.exists()) {
-                    Log.e(TAG, ">>> TEST_FAILED_MARKER: ${realPythonLib.absolutePath} not found! <<<")
+                    val fallbackDir = File(applicationInfo.sourceDir).parentFile?.let { File(it, "lib/arm64") }
+                    if (fallbackDir != null && fallbackDir.exists()) {
+                        nativeDir = fallbackDir
+                        realPythonLib = File(nativeDir, "libpython3.11.so")
+                    }
+                }
+
+                if (!realPythonLib.exists()) {
+                    Log.e(TAG, ">>> TEST_FAILED_MARKER: ${realPythonLib.absolutePath} not found! Houdini translation failed. <<<")
                     return@thread
                 }
+                
+                val pythonExe = File(nativeDir, "libpython.so")
+                val stdlibZip = File(nativeDir, "libpython.zip.so")
                 
                 // 4. Symlink trick to bypass Android Linker namespace constraints
                 val pythonLibInModules = File(modulesDir, "libpython3.11.so")
