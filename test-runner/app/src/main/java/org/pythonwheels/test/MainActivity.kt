@@ -21,7 +21,7 @@ class MainActivity : Activity() {
         val packageName = intent.getStringExtra("PACKAGE_NAME") ?: ""
 
         if (wheelUrl.isEmpty()) {
-            Log.e(TAG, ">>> TEST_FAILED_MARKER: WHEEL_URL missing from Intent! <<<")
+            Log.e(TAG, ">>> TEST_FAILED_MARKER: WHEEL_URL missing! <<<")
             return
         }
 
@@ -31,38 +31,21 @@ class MainActivity : Activity() {
                 
                 val runnerScript = File(filesDir, "runner.py")
                 copyAsset("runner.py", runnerScript)
+                
+                val nativeDir = File(applicationInfo.nativeLibraryDir)
+                val pythonExe = File(nativeDir, "libpython.so")
+                val stdlibZip = File(nativeDir, "libpython.zip.so")
 
-                // 1. Extract base C-Extensions (zlib, math)
                 val modulesDir = File(filesDir, "modules")
                 if (!modulesDir.exists() || modulesDir.listFiles()?.isEmpty() == true) {
                     extractZipFromAssets("modules.zip", modulesDir)
                 }
 
-                // 2. Ensure site-packages exists
                 val sitePackagesDir = File(filesDir, "site-packages")
                 sitePackagesDir.mkdirs()
 
-                // 3. Absolute Target for Python 3.11 Guardian (Houdini-safe fallback)
-                var nativeDir = File(applicationInfo.nativeLibraryDir)
-                var realPythonLib = File(nativeDir, "libpython3.11.so")
+                val realPythonLib = File(nativeDir, "libpython3.11.so")
                 
-                if (!realPythonLib.exists()) {
-                    val fallbackDir = File(applicationInfo.sourceDir).parentFile?.let { File(it, "lib/arm64") }
-                    if (fallbackDir != null && fallbackDir.exists()) {
-                        nativeDir = fallbackDir
-                        realPythonLib = File(nativeDir, "libpython3.11.so")
-                    }
-                }
-
-                if (!realPythonLib.exists()) {
-                    Log.e(TAG, ">>> TEST_FAILED_MARKER: ${realPythonLib.absolutePath} not found! Houdini translation failed. <<<")
-                    return@thread
-                }
-                
-                val pythonExe = File(nativeDir, "libpython.so")
-                val stdlibZip = File(nativeDir, "libpython.zip.so")
-                
-                // 4. Symlink trick to bypass Android Linker namespace constraints
                 val pythonLibInModules = File(modulesDir, "libpython3.11.so")
                 val pythonLibInSitePackages = File(sitePackagesDir, "libpython3.11.so")
                 
@@ -82,7 +65,6 @@ class MainActivity : Activity() {
                 
                 val processBuilder = ProcessBuilder(command)
 
-                // 5. Environment Setup
                 val env = processBuilder.environment()
                 
                 val systemLd = System.getenv("LD_LIBRARY_PATH") ?: ""
@@ -111,7 +93,7 @@ class MainActivity : Activity() {
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, ">>> TEST_FAILED_MARKER: Kotlin wrapper error: ${e.stackTraceToString()} <<<")
+                Log.e(TAG, ">>> TEST_FAILED_MARKER: Kotlin error: ${e.stackTraceToString()} <<<")
             }
         }
     }
