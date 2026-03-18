@@ -46,14 +46,16 @@ class MainActivity : Activity() {
                 val sitePackagesDir = File(filesDir, "site-packages")
                 sitePackagesDir.mkdirs()
 
-                // 3. Dynamic Version Discovery (Finds libpython3.11.so, 3.13.so, etc.)
-                val realPythonLib = nativeDir.listFiles { file -> 
-                    file.name.startsWith("libpython3.") && file.name.endsWith(".so") 
-                }?.firstOrNull() ?: throw Exception("libpython3.X.so not found in jniLibs!")
+                // 3. Absolute Target for Python 3.11 Guardian
+                val realPythonLib = File(nativeDir, "libpython3.11.so")
+                if (!realPythonLib.exists()) {
+                    Log.e(TAG, ">>> TEST_FAILED_MARKER: ${realPythonLib.absolutePath} not found! <<<")
+                    return@thread
+                }
                 
                 // 4. Symlink trick to bypass Android Linker namespace constraints
-                val pythonLibInModules = File(modulesDir, realPythonLib.name)
-                val pythonLibInSitePackages = File(sitePackagesDir, realPythonLib.name)
+                val pythonLibInModules = File(modulesDir, "libpython3.11.so")
+                val pythonLibInSitePackages = File(sitePackagesDir, "libpython3.11.so")
                 
                 try {
                     if (!pythonLibInModules.exists()) Os.symlink(realPythonLib.absolutePath, pythonLibInModules.absolutePath)
