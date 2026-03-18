@@ -89,10 +89,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: 🚀 Trigger QA Inspector
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run test-wheel.yml \
+            --repo ${{ github.repository }} \
             -f package="${{ inputs.package }}" \
             -f import_name="${{ inputs.import_name }}"

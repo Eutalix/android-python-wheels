@@ -11,10 +11,11 @@ echo "Detected version: $PKG_VER"
 NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
 export PATH="$NDK_BIN:$PATH"
 
+LONG_BIT_FLAG=""
 case "$ARCH" in
     "arm64-v8a")   CC_TARGET="aarch64-linux-android${API_LEVEL}"; PLAT_TAG="linux_aarch64" ;;
-    "armeabi-v7a") CC_TARGET="armv7a-linux-androideabi${API_LEVEL}"; PLAT_TAG="linux_armv7l" ;;
-    "x86")         CC_TARGET="i686-linux-android${API_LEVEL}"; PLAT_TAG="linux_i686" ;;
+    "armeabi-v7a") CC_TARGET="armv7a-linux-androideabi${API_LEVEL}"; PLAT_TAG="linux_armv7l"; LONG_BIT_FLAG="-DPY_LONG_SIZE_T=4" ;;
+    "x86")         CC_TARGET="i686-linux-android${API_LEVEL}"; PLAT_TAG="linux_i686"; LONG_BIT_FLAG="-DPY_LONG_SIZE_T=4" ;;
     "x86_64")      CC_TARGET="x86_64-linux-android${API_LEVEL}"; PLAT_TAG="linux_x86_64" ;;
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
@@ -36,7 +37,7 @@ build_time_vars = {
     'AR': '$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar',
     'LD': '$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld',
     'LDSHARED': '$NDK_BIN/${CC_TARGET}-clang -shared',
-    'ARFLAGS': 'rcs', 'CFLAGS': '-fPIC', 'CXXFLAGS': '-fPIC', 'CPPFLAGS': '-I$HOST_INCLUDE',
+    'ARFLAGS': 'rcs', 'CFLAGS': '-fPIC', 'CXXFLAGS': '-fPIC', 'CPPFLAGS': '-I$HOST_INCLUDE $LONG_BIT_FLAG',
     'LDFLAGS': '-L$MOCK_DIR -lpython$PY_VER', 'CCSHARED': '-fPIC', 'VERSION': '$PY_VER',
     'GNULD': 'yes', 'Py_DEBUG': 0, 'WITH_PYMALLOC': 1,
 }
@@ -54,6 +55,7 @@ export CXX="$NDK_BIN/${CC_TARGET}-clang++"
 export AR="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
 export LDSHARED="$CC -shared"
 export CFLAGS="-target $CC_TARGET -fPIC -I$HOST_INCLUDE"
+export CPPFLAGS="-I$HOST_INCLUDE $LONG_BIT_FLAG"
 export LDFLAGS="-target $CC_TARGET -L$MOCK_DIR -lpython$PY_VER"
 
 PY_TAG="cp${PY_VER/./}"
@@ -86,6 +88,10 @@ find wheel_patch -name "*.so" -exec patchelf --set-rpath '$ORIGIN' {} \; || true
 pushd wheel_patch > /dev/null
 zip -q -r "$WHEEL_ABS" .
 popd > /dev/null
+rm -rf wheel_patch
+
+echo "Analyzing generated binary:"
+file $(find wheel_patch -name "*.so" | head -n 1) || true
 rm -rf wheel_patch
 
 cp "$WHEEL_ABS" "$OUT_DIR/"
