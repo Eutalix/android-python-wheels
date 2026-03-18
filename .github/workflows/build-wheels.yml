@@ -1,0 +1,86 @@
+name: ⚙️ Build Android Wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package directory name (e.g., brotli)'
+        required: true
+        type: string
+      import_name:
+        description: 'Python import name for testing (e.g., brotli)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  ANDROID_API: 24
+  NDK_VERSION: '25.2.9519653'
+
+jobs:
+  build:
+    name: 🏗️ Py${{ matrix.py_ver }} | ${{ matrix.arch }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        py_ver: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        arch: ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64']
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py_ver }}
+
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager "ndk;${{ env.NDK_VERSION }}" > /dev/null
+        
+      - name: 🚀 Execute build.sh
+        env:
+          PKG_NAME: ${{ inputs.package }}
+          ARCH: ${{ matrix.arch }}
+          PY_VER: ${{ matrix.py_ver }}
+          API_LEVEL: ${{ env.ANDROID_API }}
+          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/${{ env.NDK_VERSION }}
+        run: |
+          mkdir -p dist
+          export OUT_DIR="$(pwd)/dist"
+          
+          SCRIPT_PATH="build-wheels/$PKG_NAME/build.sh"
+          if [ ! -f "$SCRIPT_PATH" ]; then
+            echo "::error::Build script not found: $SCRIPT_PATH"
+            exit 1
+          fi
+
+          chmod +x "$SCRIPT_PATH"
+          bash "$SCRIPT_PATH"
+
+      - name: 🗑️ Upload to Staging Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "staging-wheels"
+          name: "Staging Zone (Internal)"
+          body: "Temporary holding area for wheels awaiting QA Emulator validation."
+          files: dist/*.whl
+          make_latest: false 
+
+  trigger-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Trigger QA Inspector
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Triggers the Test Emulator using Python 3.11 ARM64 as the universal benchmark
+          gh workflow run test-wheel.yml \
+            -f package="${{ inputs.package }}" \
+            -f import_name="${{ inputs.import_name }}"
