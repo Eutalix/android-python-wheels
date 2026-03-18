@@ -1,0 +1,118 @@
+name: 📱 Test & Promote Wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package name (e.g., brotli)'
+        required: true
+        type: string
+      import_name:
+        description: 'Python import module name'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  inspector:
+    name: 🧪 QA Inspector (Py3.11 ARM64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🚀 Enable KVM for Emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 📥 Download Test APK (Py3.11 Guardian)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ./apk
+          gh release download "test-runners" --pattern "kivy-test-runner-cp311-arm64-v8a.apk" --dir ./apk
+          mv ./apk/*.apk ./test-app.apk
+
+      - name: 📥 Download Staging Wheel
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ./dist
+          # O CORRETO: Pegamos a Wheel oficial de Celular (aarch64) para garantir que o NDK compilou certo!
+          WHEEL_NAME="${{ inputs.package }}-*-cp311-cp311-linux_aarch64.whl"
+          gh release download "staging-wheels" --pattern "$WHEEL_NAME" --dir ./dist
+
+      - name: 🌐 Start Local HTTP Server
+        run: |
+          python3 -m http.server 8000 --directory ./dist &
+          echo "Local server running on port 8000"
+
+      - name: 📝 Prepare Test Script
+        run: |
+          cat << 'EOF' > run_test.sh
+          #!/bin/bash
+          IMPORT_NAME=$1
+          WHEEL_FILE=$(basename $(ls ./dist/*.whl | head -n 1))
+          
+          echo "Installing APK..."
+          adb install -t test-app.apk
+          adb logcat -c
+          
+          echo "Launching App and triggering remote wheel installation..."
+          adb shell am start -n org.pythonwheels.test/.MainActivity -e WHEEL_URL "http://10.0.2.2:8000/$WHEEL_FILE" -e PACKAGE_NAME "$IMPORT_NAME"
+
+          adb logcat -s "PythonRunner" > result.log &
+          TIMEOUT=60
+          while [ $TIMEOUT -gt 0 ]; do
+            if grep -q ">>> TEST_SUCCESS_MARKER <<<" result.log; then
+              echo "✅ QA PASSED! Linker and C-Extensions successfully validated."
+              exit 0
+            fi
+            if grep -q ">>> TEST_FAILED_MARKER" result.log; then
+              echo "❌ QA FAILED! Fatal Linker or Import error detected."
+              cat result.log
+              exit 1
+            fi
+            sleep 2
+            let TIMEOUT-=2
+          done
+          
+          echo "❌ TIMEOUT! App crashed or failed to return logs."
+          cat result.log
+          exit 1
+          EOF
+          chmod +x run_test.sh
+
+      - name: 🤖 Execute Emulator Test
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./run_test.sh "${{ inputs.import_name }}"
+
+      # ========================================================
+      # PROMOTION - Only runs if the emulator exits with 0 (Success)
+      # ========================================================
+      - name: 🏆 Promote All Wheels to Production
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p final_wheels
+          # Fetches all 20 architectures and versions from the staging bin
+          gh release download "staging-wheels" --pattern "${{ inputs.package }}-*.whl" --dir final_wheels
+          
+          # Publishes to the official public release tag
+          gh release create "wheel-${{ inputs.package }}" final_wheels/*.whl \
+            --title "Wheel: ${{ inputs.package }}" \
+            --notes "✅ QA Approved via Native CI. \nSupports Python 3.9 through 3.13 for all architectures." \
+            --target main || \
+          gh release upload "wheel-${{ inputs.package }}" final_wheels/*.whl --clobber

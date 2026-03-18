@@ -1,0 +1,56 @@
+name: 🌐 Update PyPI Index (HTML & JSON)
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published, edited, released]
+  workflow_run:
+    workflows: ["📱 Test & Promote Wheels"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-index:
+    # Only runs if triggered by a Release or if the QA test passed successfully
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    name: Generate PEP 503 Index & API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: ⚙️ Generate Static Site & JSON
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 scripts/generate_index.py
+
+      - name: 📦 Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: 📤 Upload Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-index
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
