@@ -34,12 +34,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup System
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential libtool pkg-config libssl-dev libffi-dev zlib1g-dev autoconf automake libtool-bin zip gettext patchelf
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.py_ver }}
 
-      - name: Setup Java 17 (Required for Android SDK)
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -47,6 +52,9 @@ jobs:
 
       - name: Setup Android NDK
         uses: android-actions/setup-android@v3
+        
+      - name: Install NDK
+        run: yes | sdkmanager "ndk;${{ env.NDK_VERSION }}"
         
       - name: 🚀 Execute build.sh
         env:
@@ -85,7 +93,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Triggers the Test Emulator using Python 3.11 ARM64 as the universal benchmark
           gh workflow run test-wheel.yml \
             -f package="${{ inputs.package }}" \
             -f import_name="${{ inputs.import_name }}"
