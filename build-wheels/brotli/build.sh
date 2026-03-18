@@ -54,7 +54,7 @@ export CC="$NDK_BIN/${CC_TARGET}-clang"
 export CXX="$NDK_BIN/${CC_TARGET}-clang++"
 export AR="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
 export LDSHARED="$CC -shared"
-export CFLAGS="-target $CC_TARGET -fPIC -I$HOST_INCLUDE"
+export CFLAGS="-target $CC_TARGET -fPIC -I$HOST_INCLUDE $LONG_BIT_FLAG"
 export CPPFLAGS="-I$HOST_INCLUDE $LONG_BIT_FLAG"
 export LDFLAGS="-target $CC_TARGET -L$MOCK_DIR -lpython$PY_VER"
 
@@ -91,9 +91,8 @@ popd > /dev/null
 rm -rf wheel_patch
 
 echo "Analyzing generated binary:"
-unzip -q "$WHEEL_ABS" -d check_wheel
-file check_wheel/*.so || true
-rm -rf check_wheel
+file $(find wheel_patch -name "*.so" | head -n 1) || true
+rm -rf wheel_patch
 
 cp "$WHEEL_ABS" "$OUT_DIR/"
 echo "✅ Build completed successfully: $OUT_DIR/$(basename "$WHEEL_ABS")"
