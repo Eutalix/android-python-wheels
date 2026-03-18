@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.pythonwheels.test">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- extractNativeLibs="true" is mandatory to expose .so files to the ProcessBuilder -->
+    <!-- usesCleartextTraffic="true" allows HTTP downloads from local emulator IP 10.0.2.2 -->
+    <application
+        android:extractNativeLibs="true"
+        android:usesCleartextTraffic="true"
+        android:label="Test Runner">
+        
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
