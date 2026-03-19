@@ -107,12 +107,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p final_wheels
-          # Fetches all 20 architectures and versions from the staging bin
+          # Fetches all compiled architectures and versions from the staging bin
           gh release download "staging-wheels" --pattern "${{ inputs.package }}-*.whl" --dir final_wheels
+          
+          # Extracts the actual package version from the first wheel found
+          WHEEL_FILE=$(ls final_wheels/*.whl | head -n 1)
+          PKG_VERSION=$(basename "$WHEEL_FILE" | cut -d'-' -f2)
+          
+          # Creates a rich Markdown release note
+          NOTES="### 📱 Android Native Python Wheels\n\n"
+          NOTES+="**Package:** \`${{ inputs.package }}\`\n"
+          NOTES+="**Version:** \`$PKG_VERSION\`\n\n"
+          NOTES+="✅ **QA Status:** Passed natively on Emulated Android via CI.\n\n"
+          NOTES+="* **Supported Python:** 3.9, 3.10, 3.11, 3.12, 3.13\n"
+          NOTES+="* **Supported Archs:** \`arm64-v8a\`, \`armeabi-v7a\`, \`x86\`, \`x86_64\`\n"
+          NOTES+="* **Linker Safetry:** \`RUNPATH=\$ORIGIN\` injected to bypass Android API 29+ Namespace restrictions."
           
           # Publishes to the official public release tag
           gh release create "wheel-${{ inputs.package }}" final_wheels/*.whl \
-            --title "Wheel: ${{ inputs.package }}" \
-            --notes "✅ QA Approved via Native CI. \nSupports Python 3.9 through 3.13 for all architectures." \
+            --title "${{ inputs.package }} v$PKG_VERSION" \
+            --notes "$NOTES" \
             --target main || \
+          gh release edit "wheel-${{ inputs.package }}" --title "${{ inputs.package }} v$PKG_VERSION" --notes "$NOTES" && \
           gh release upload "wheel-${{ inputs.package }}" final_wheels/*.whl --clobber
