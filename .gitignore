@@ -15,7 +15,6 @@ test-runner/app/build/
 test-runner/local.properties
 test-runner/**/*.apk
 test-runner/**/*.aar
-test-runner/**/*.so
 
 # IDEs
 .idea/
@@ -27,5 +26,8 @@ test-runner/**/*.so
 Thumbs.db
 
 # Github Pages
+site/
+public/
+Pages
 site/
 public/
