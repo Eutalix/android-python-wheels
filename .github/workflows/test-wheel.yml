@@ -43,7 +43,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p ./dist
-          # O CORRETO: Pegamos a Wheel oficial de Celular (aarch64) para garantir que o NDK compilou certo!
           WHEEL_NAME="${{ inputs.package }}-*-cp311-cp311-linux_aarch64.whl"
           gh release download "staging-wheels" --pattern "$WHEEL_NAME" --dir ./dist
 
@@ -114,19 +113,26 @@ jobs:
           WHEEL_FILE=$(ls final_wheels/*.whl | head -n 1)
           PKG_VERSION=$(basename "$WHEEL_FILE" | cut -d'-' -f2)
           
-          # Creates a rich Markdown release note
-          NOTES="### 📱 Android Native Python Wheels\n\n"
-          NOTES+="**Package:** \`${{ inputs.package }}\`\n"
-          NOTES+="**Version:** \`$PKG_VERSION\`\n\n"
-          NOTES+="✅ **QA Status:** Passed natively on Emulated Android via CI.\n\n"
-          NOTES+="* **Supported Python:** 3.9, 3.10, 3.11, 3.12, 3.13\n"
-          NOTES+="* **Supported Archs:** \`arm64-v8a\`, \`armeabi-v7a\`, \`x86\`, \`x86_64\`\n"
-          NOTES+="* **Linker Safetry:** \`RUNPATH=\$ORIGIN\` injected to bypass Android API 29+ Namespace restrictions."
+          # Creates a rich Markdown release note using a real text file (bulletproof formatting)
+          cat <<EOF > release_notes.md
+          ### 📱 Android Native Python Wheels
+
+          **Package:** \`${{ inputs.package }}\`
+          **Version:** \`$PKG_VERSION\`
+
+          ✅ **QA Status:** Passed natively on Emulated Android via CI.
+
+          * **Supported Python:** 3.9, 3.10, 3.11, 3.12, 3.13
+          * **Supported Archs:** \`arm64-v8a\`, \`armeabi-v7a\`, \`x86\`, \`x86_64\`
+          * **Linker Safety:** \`RUNPATH=\$ORIGIN\` injected to bypass Android API 29+ Namespace restrictions.
+          EOF
           
-          # Publishes to the official public release tag
+          # Publishes to the official public release tag using the notes file
           gh release create "wheel-${{ inputs.package }}" final_wheels/*.whl \
             --title "${{ inputs.package }} v$PKG_VERSION" \
-            --notes "$NOTES" \
+            --notes-file release_notes.md \
             --target main || \
-          gh release edit "wheel-${{ inputs.package }}" --title "${{ inputs.package }} v$PKG_VERSION" --notes "$NOTES" && \
+          gh release edit "wheel-${{ inputs.package }}" \
+            --title "${{ inputs.package }} v$PKG_VERSION" \
+            --notes-file release_notes.md && \
           gh release upload "wheel-${{ inputs.package }}" final_wheels/*.whl --clobber
