@@ -96,9 +96,8 @@ mkdir -p wheel_patch
 unzip -q "$WHEEL_ABS" -d wheel_patch
 
 echo "Injecting deterministic RPATH into .so files..."
-# --force-rpath ensures highest priority for the Android linker.
 # $ORIGIN/.libs guarantees support for complex packages bundling shared dependencies.
-find wheel_patch -name "*.so" -exec patchelf --force-rpath --set-rpath '$ORIGIN:$ORIGIN/.libs' {} \; || true
+find wheel_patch -name "*.so" -exec patchelf --set-rpath '$ORIGIN:$ORIGIN/.libs' {} \; || true
 
 pushd wheel_patch > /dev/null
 zip -q -r "$WHEEL_ABS" .
